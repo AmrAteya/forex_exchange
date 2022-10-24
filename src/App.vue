@@ -1,7 +1,7 @@
 <template>
   <v-app>
-    <v-main class="d-flex align-center justify-center">
-      <v-card elevation="2">
+    <v-main class="pt-5">
+      <v-card class="d-flex align-center justify-center" elevation="0">
         <v-row>
           <v-col
             cols="12"
@@ -11,6 +11,7 @@
             xs="12"
             class="d-flex align-center justify-end"
           >
+          <!-- Currency selectors start -->
             <v-row class="d-flex align-center justify-end">
               <v-col
                 cols="12"
@@ -21,6 +22,7 @@
                 class="d-flex align-center justify-center"
               >
                 <v-select
+                  :loading="selectorLoading"
                   outlined
                   :items="currencies"
                   item-text="text"
@@ -40,6 +42,7 @@
                 class="d-flex align-center justify-center"
               >
                 <v-select
+                  :loading="selectorLoading"
                   outlined
                   :items="currencies"
                   item-text="text"
@@ -51,7 +54,9 @@
                 />
               </v-col>
             </v-row>
+            <!-- Currency selectors end -->
           </v-col>
+          <!-- Chart start -->
           <v-col cols="12" lg="8" md="6" sm="12" xs="12">
             <v-card :loading="chartLoading" elevation="5" class="px-5 ma-5">
               <div
@@ -60,17 +65,41 @@
               <div
                 :class="`currency-flag currency-flag-${currency.to.toLowerCase()} mt-5`"
               ></div>
-              <v-chip color="primary" @click="goToForexSite" class="mb-8 ml-2"
+              <v-chip @click="goToForexSite" class="mb-8 ml-2"
                 >Forex.com</v-chip
               >
+              <div
+                class="
+                  d-flex
+                  justify-space-between
+                  content-center
+                  bg
+                  fill-height
+                  align-center
+                  justify-center
+                "
+              >
+                <div class="text-center font-weight-bold" :class="{'text-h5':$vuetify.breakpoint.smAndDown, 'text-h4':$vuetify.breakpoint.mdAndUp}">
+                  {{ currency.from + "/" + currency.to }}
+                </div>
+                <div v-if="seriesArea[0].data.length">
+                  <div class="text-center font-weight-bold" :class="{'text-h5':$vuetify.breakpoint.smAndDown, 'text-h4':$vuetify.breakpoint.mdAndUp}">
+                    {{getCurrencySymbol('en-US', currency.to)}}
+                    {{ currentPrice }}
+                  </div>
+                  <div class="mt-2 text-subtitle-1 text info--text">
+                    {{ startingVSEndingPrice }}
+                  </div>
+                </div>
+              </div>
               <ApexChart
                 class="mx-2 chart d-flex align-center justify-center"
                 width="90%"
                 type="area"
-                :options="optionsArea"
+                :options="chartOptions"
                 :series="seriesArea"
                 :sparkline="{
-                  enabled: false,
+                  enabled: true,
                 }"
               />
               <div class="d-flex align-center justify-center pb-5">
@@ -84,8 +113,40 @@
               </div>
             </v-card>
           </v-col>
+          <!-- Chart end -->
         </v-row>
       </v-card>
+      <!-- Bottom sheet start (For live pricing) -->
+      <v-bottom-navigation
+        app
+        class="
+          d-flex
+          justify-space-around
+          content-center
+          bg
+          fill-height
+          align-center
+          justify-center
+        "
+      >
+        <v-progress-circular
+          v-if="!message.symbol"
+          size="30"
+          color="primary"
+          indeterminate
+        ></v-progress-circular>
+        <div v-else>
+          <div class="text-h6">
+            <v-icon small class="mb-1" color="red">mdi-circle</v-icon>
+            {{ message.symbol.slice(0, 3) + "/" + message.symbol.slice(3) }}
+          </div>
+          <span>
+            Ask: {{ message["ask"] }} | mid: {{ message.mid }} | Bid:
+            {{ message.bid }}
+          </span>
+        </div>
+      </v-bottom-navigation>
+      <!-- Bottom navigation end (For live pricing) -->
     </v-main>
   </v-app>
 </template>
@@ -100,100 +161,67 @@ export default {
       chartLoading: false,
       period: "",
       periods: {
-        "15M": { time: 15, unit: "minutes" },
-        "1H": { time: 1, unit: "hours" },
-        "1D": { time: 1, unit: "days" },
-        "1W": { time: 1, unit: "weeks" },
-        "1M": { time: 1, unit: "months" },
+        "15M": { time: 15, unit: "minutes", interval: "minute" },
+        "1H": { time: 1, unit: "hours", interval: "minute" },
+        "1D": { time: 1, unit: "days", interval: "hourly" },
+        "1W": { time: 1, unit: "weeks", interval: "hourly" },
+        "1M": { time: 1, unit: "months", interval: "daily" },
       },
-      currenciesObj: {
-    "AED": "UAE Dirham", 
-    "ALL": "Albanian Lek", 
-    "ARS": "Argentine Peso", 
-    "AUD": "Australian Dollar", 
-    "BGN": "Bulgaria Lev", 
-    "BHD": "Bahraini Dinar", 
-    "BRL": "Brazilian Real", 
-    "CAD": "Canadian Dollar", 
-    "CHF": "Swiss Franc", 
-    "CLP": "Chilean Peso", 
-    "CNH": "Chinese Yuan offshore", 
-    "CNY": "Chinese Yuan onshore", 
-    "COP": "Colombian Peso", 
-    "CZK": "Czech Koruna", 
-    "DKK": "Danish Krone", 
-    "EUR": "Euro", 
-    "GBP": "British Pound Sterling", 
-    "GHS": "Ghanaian Cedi", 
-    "HKD": "Hong Kong Dollar", 
-    "HRK": "Croatian Kuna", 
-    "HUF": "Hungarian Forint", 
-    "IDR": "Indonesian Rupiah", 
-    "ILS": "Israeli New Sheqel", 
-    "INR": "Indian Rupee", 
-    "ISK": "Icelandic Krona", 
-    "JPY": "Japanese Yen", 
-    "KES": "Kenyan Shillings", 
-    "KRW": "South Korean Won", 
-    "KWD": "Kuwaiti Dinar", 
-    "MAD": "Moroccan Dirham", 
-    "MUR": "Mauritian Rupee", 
-    "MXN": "Mexican Peso", 
-    "MYR": "Malaysian Ringgit", 
-    "NGN": "Nigerean Naira", 
-    "NOK": "Norwegian Krone", 
-    "NZD": "New Zealand Dollar", 
-    "OMR": "Omani Rial", 
-    "PEN": "Peruvian Nuevo Sol", 
-    "PHP": "Philippine Peso", 
-    "PLN": "Polish Zloty", 
-    "QAR": "Qatari Rial", 
-    "RON": "Romanian Leu", 
-    "RUB": "Russian Ruble", 
-    "SAR": "Saudi Arabian Riyal", 
-    "SEK": "Swedish Krona", 
-    "SGD": "Singapore Dollar", 
-    "THB": "Thai Baht", 
-    "TRY": "Turkish Lira", 
-    "TWD": "Taiwanese Dollar", 
-    "USD": "US Dollar", 
-    "VND": "Vietnamese Dong", 
-    "XAG": "Silver (troy ounce)", 
-    "XAU": "Gold (troy ounce)", 
-    "XOF": "West African CFA franc", 
-    "XPD": "Palladium", 
-    "XPT": "Platinum", 
-    "ZAR": "South African Rand", 
-    "ZWL": "Zimbabwean Dollar"
-  },
-  currencies: [],
+      selectorLoading: false,
+      currencies: [],
       currency: {
-        from: 'EUR',
-        to: 'USD'
+        from: "EUR",
+        to: "USD",
       },
       seriesArea: [
         {
-          name: "",
+          name: "Exchange",
           data: [],
         },
       ],
       times: [],
+      message: {
+        symbol: "",
+        ask: "",
+        bid: "",
+        mid: "",
+      },
+      startingVSEndingPrice: "",
+      currentPrice: "",
     };
   },
   watch: {
+    // This watcher is for handling on change period from under the chart
     period(val) {
-      console.log(this.periods[val])
-      // this.getLiveCurrencyExchange(this.periods[val])
+      this.getCurrencyExchangeTimeseries(this.periods[val]);
     },
-    'currency': {
-      handler(val) {
-        console.log(val)
+    // This watcher is for performing actions when changing the currency from selectors
+    'currency.to': {
+      handler(newVal, oldVal) {
+        if (newVal == this.currency.from) {
+          this.currency.from = oldVal
+          return
+        }
+        this.period = ''
+        this.getCurrencyExchangeTimeseries(undefined, this.currency.from + this.currency.to)
       },
       deep: true
-    }
+    },
+    'currency.from': {
+     handler(newVal, oldVal) {
+        if (newVal == this.currency.to) {
+          this.currency.to = oldVal
+          return
+        }
+        this.period = ''
+        this.getCurrencyExchangeTimeseries(undefined, this.currency.from + this.currency.to)
+      },
+      deep: true
+    },
   },
   computed: {
-    optionsArea() {
+    // Chaart options
+    chartOptions() {
       return {
         xaxis: {
           categories: this.times,
@@ -220,18 +248,6 @@ export default {
         },
         tooltip: {
           enabled: true,
-          // enabledOnSeries: undefined,
-          // shared: true,
-          // followCursor: false,
-          intersect: false,
-          // inverseOrder: false,
-          // custom: undefined,
-          // fillSeriesColor: false,
-          // theme: false,
-          // style: {
-          //   fontSize: "12px",
-          //   fontFamily: undefined,
-          // },
           onDatasetHover: {
             highlightDataSeries: true,
           },
@@ -240,60 +256,67 @@ export default {
           },
           y: {
             formatter: undefined,
-            // title: {
-            //   formatter: (seriesName) => seriesName + ' %',
-            // },
-          },
-          marker: {
-            show: true,
           },
         },
       };
-    },
-    nowDate() {
-      return moment().format("YYYY-MM-DD");
-    },
-    nowDateWithHHMM() {
-      return moment().format("YYYY-MM-DD-HH:MM");
-    },
+    }
   },
   methods: {
+    // Get currencies
     getCurrencies() {
-      // Axios.get(
-      //   "https://marketdata.tradermade.com/api/v1/live_currencies_list?api_key=eOfPku3ezlOjlMitRDuU"
-      // )
-      //   .then((response) => {
-          for (const currencyCode in this.currenciesObj) {
+      this.selectorLoading = true;
+      Axios.get(
+        "https://marketdata.tradermade.com/api/v1/live_currencies_list?api_key=eOfPku3ezlOjlMitRDuU"
+      )
+        .then((response) => {
+          for (const currencyCode in response.data.available_currencies) {
             this.currencies.push({
               value: currencyCode,
-              text: this.currenciesObj[currencyCode]
-            })
+              text: response.data.available_currencies[currencyCode],
+            });
           }
-        
-        // .catch((error) => {
-        //   console.log(error);
-        // });
+        })
+        .catch((error) => {
+          console.log(error);
+        })
+        .finally(() => {
+          this.selectorLoading = false;
+        });
     },
-    /* eslint-disable */
-    getLiveCurrencyExchange(start={time: 1, unit: 'months'}, interval, currencies="EURUSD") {
-      /*
+    /*
+        Get currency exchange timeseries
         start: Object {time: integetr, unit: string [months, weeks, days, hours, minutes...]}
         interval: string [daily, hourly, minute]
       */
+    getCurrencyExchangeTimeseries(
+      start = { time: 12, unit: "months", interval: "daily" },
+      currencies = this.currency.from + this.currency.to
+    ) {
+      this.chartLoading = true;
       let now = new Date();
       let nowTime = moment(now).subtract(3, "hours");
+      let timeNow = nowTime.format("YYYY-MM-DD-HH:MM");
       let startTime = nowTime
         .subtract(start.time, start.unit)
         .format("YYYY-MM-DD-HH:MM");
-      let timeNow = nowTime.format("YYYY-MM-DD-HH:MM");
+      let interval = start.interval;
       Axios.get(
         `https://marketdata.tradermade.com/api/v1/timeseries?currency=${currencies}&api_key=eOfPku3ezlOjlMitRDuU&start_date=${startTime}&end_date=${timeNow}&format=records&interval=${interval}`
       )
         .then((response) => {
+          this.seriesArea[0].data = [];
+          this.times = [];
           response.data.quotes.forEach((el) => {
             this.seriesArea[0].data.push(el.close);
             this.times.push(el.date);
           });
+          this.currentPrice =
+            response.data.quotes[response.data.quotes.length - 1].close;
+          this.startingVSEndingPrice = `${(
+            this.currentPrice - response.data.quotes[0].close
+          ).toFixed(6)}  (${(
+            this.currentPrice / response.data.quotes[0].close
+          ).toFixed(6)} %)`;
         })
         .catch((error) => {
           console.log(error);
@@ -302,26 +325,53 @@ export default {
           this.chartLoading = false;
         });
     },
+    // Open forex site in new tab
     goToForexSite() {
       window.open("https://forex.com", "_blank");
     },
+    // Connect to websocket to get live pricing of selected currency pair
+    connectToWebSocket() {
+      var reconnectInterval = 1000 * 5;
+      let exchange = this.currency.from + this.currency.to;
+      const connection = new WebSocket(
+        "wss://marketdata.tradermade.com/feedadv"
+      );
+      connection.onopen = function () {
+        connection.send(
+          `{"userKey":"wsTOJUe98dFrf3pQx_HQ", "symbol":"${exchange}"}`
+        );
+      };
+      connection.onclose = () => {
+        console.log("socket close : will reconnect in " + reconnectInterval);
+        setTimeout(() => {
+          this.connectToWebSocket()
+        }, reconnectInterval);
+      };
+      connection.onmessage = (event) => {
+        setTimeout(() => {
+          if(event.data.includes('{')) {
+            this.message = JSON.parse(event.data);
+          }
+        }, 5000);
+      };
+    },
+    // Get currency symbol using javascript
+    getCurrencySymbol(locale, currency) {
+      return (0)
+        .toLocaleString(locale, {
+          style: "currency",
+          currency: currency,
+          minimumFractionDigits: 0,
+          maximumFractionDigits: 0,
+        })
+        .replace(/\d/g, "")
+        .trim();
+    },
   },
   created() {
-    this.getCurrencies()
-    // setTimeout(() => {
-    //   this.getLiveCurrencyExchange()
-    // }, 1000);
-    let now = new Date();
-    let start = {
-      time: 10,
-      unit: "hours",
-    };
-    let startTime = moment(now)
-      .subtract(3, "hours")
-      .subtract(parseInt(start.time), start.unit)
-      .format("YYYY-MM-DD-HH:MM");
-    let timeNow = moment(now).subtract(3, "hours").format("YYYY-MM-DD-HH:MM");
-    console.log(startTime, timeNow);
+    this.connectToWebSocket();
+    this.getCurrencies();
+    this.getCurrencyExchangeTimeseries()
   },
 };
 </script>
@@ -334,5 +384,8 @@ export default {
 .v-btn {
   border-radius: 20% !important;
   width: 5vw !important;
+}
+.v-app {
+  height: 90vh !important;
 }
 </style>
